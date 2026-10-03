@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Laboratorio de Sucesiones y Series</title>
+  
+  <!-- Carga de Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Carga de Fuentes -->
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+  
+  <!-- Carga de KaTeX para matemáticas renderizadas por GPU -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/cancel.min.js"></script>
+  
+  <!-- Carga de GSAP para animaciones fluidas -->
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.2/dist/gsap.min.js"></script>
+  
+  <!-- Carga de Lucide para los iconos -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            app: ['Poppins', 'sans-serif'],
+          },
+          animation: {
+            floatUp: 'floatUp linear infinite',
+            slideInRight: 'slideInRight 0.3s ease-out forwards',
+            slideInUp: 'slideInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+            confettiExplosion: 'confettiExplosion 1.8s cubic-bezier(0.25, 1, 0.5, 1) forwards',
+            robotFloat: 'robotFloat 3s ease-in-out infinite',
+            robotJump: 'robotJump 1s cubic-bezier(0.28, 0.84, 0.42, 1) infinite',
+            robotTalkArmL: 'robotTalkArmL 0.6s ease-in-out infinite',
+            robotTalkArmR: 'robotTalkArmR 0.6s ease-in-out infinite 0.1s',
+          },
+          keyframes: {
+            floatUp: { '0%': { transform: 'translateY(100vh) rotate(0deg)' }, '100%': { transform: 'translateY(-100vh) rotate(360deg)' } },
+            slideInRight: { '0%': { opacity: 0, transform: 'translateX(20px)' }, '100%': { opacity: 1, transform: 'translateX(0)' } },
+            slideInUp: { 'from': { opacity: 0, transform: 'translateY(40px)' }, 'to': { opacity: 1, transform: 'translateY(0)' } },
+            confettiExplosion: { 
+              '0%': { transform: 'translate(0, 0) scale(1) rotate(0deg)', opacity: 1 }, 
+              '80%': { opacity: 1 }, 
+              '100%': { transform: 'translate(var(--tx), var(--ty)) scale(0) rotate(var(--rot))', opacity: 0 } 
+            },
+            robotFloat: { '0%, 100%': { transform: 'translateY(0)' }, '50%': { transform: 'translateY(-8px)' } },
+            robotJump: { '0%, 100%': { transform: 'translateY(0)' }, '30%': { transform: 'translateY(-20px)' } },
+            robotTalkArmL: { '0%, 100%': { transform: 'rotate(45deg)' }, '50%': { transform: 'rotate(90deg)' } },
+            robotTalkArmR: { '0%, 100%': { transform: 'rotate(-45deg)' }, '50%': { transform: 'rotate(-90deg)' } }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body { font-family: 'Poppins', sans-serif; margin: 0; padding: 0; overflow-x: hidden; background-color: #0a0f1d; }
+    
+    /* OVERRIDES DE KATEX PARA MAYOR LEGIBILIDAD (NEGRITA Y SOMBRA) */
+    .katex-html { 
+       text-shadow: 0 0 1px currentColor, 0.5px 0 0px currentColor; 
+       font-weight: bold;
+    }
+    .katex { font-size: inherit !important; font-weight: bold; }
+    .katex-display { margin: 0 !important; }
+    
+    /* Estilos del Scrollbar */
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: rgba(0,0,0,0.05); }
+    ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.2); border-radius: 10px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.3); }
+  </style>
+</head>
+<body>
+
+  <!-- Contenedor Principal de la App -->
+  <div id="root" class="font-app w-full min-h-[100dvh]"></div>
+
+  <script>
+    // ==========================================
+    // MOTOR MATEMÁTICO (Para la Lógica y Fracciones)
+    // ==========================================
+    const f_gcd = (a, b) => b === 0 ? a : f_gcd(b, a % b);
+
+    const frac = (n, d = 1) => {
+      if (typeof n === 'object' && n !== null) return n; 
+      const divisor = f_gcd(Math.abs(n), Math.abs(d));
+      const sign = (n < 0) ^ (d < 0) ? -1 : 1;
+      return { n: sign * (Math.abs(n) / divisor), d: Math.abs(d) / divisor };
+    };
+
+    const f_add = (f1, f2) => frac(f1.n * f2.d + f2.n * f1.d, f1.d * f2.d);
+    const f_mul = (f1, f2) => frac(f1.n * f2.n, f1.d * f2.d);
+    const f_mulInt = (f, i) => frac(f.n * i, f.d);
+    const f_divInt = (f, i) => frac(f.n, f.d * i);
+
+    // Convertidor a texto LaTeX para KaTeX
+    const toTex = (f, withSign = false) => {
+      let n = f.n;
+      let d = f.d;
+      let sign = n < 0 ? '-' : (withSign ? '+' : '');
+      let absN = Math.abs(n);
+      
+      if (d === 1) return `${sign}${absN}`;
+      return `${sign}\\frac{${absN}}{${d}}`;
+    };
+
+    // ==========================================
+    // BANCO DE EJERCICIOS
+    // ==========================================
+    const EXERCISES = [
+      {
+        id: 1, title: "Las semillas sembradas", icon: "sprout",
+        color: "from-emerald-500/30 to-green-600/30",
+        statement: "En un huerto escolar, el primer surco tiene 8 semillas. Cada nuevo surco tiene 5 semillas más que el anterior.",
+        qa: "¿Cuántas semillas tendrá el surco 16?", qb: "¿Cuántas semillas habrá en total hasta el surco 16?",
+        a1: {n: 8, d: 1}, r: {n: 5, d: 1}, n: 16
+      },
+      {
+        id: 2, title: "Las canicas de Pedro", icon: "circle-dot",
+        color: "from-blue-500/30 to-indigo-600/30",
+        statement: "Pedro gana 10 canicas el primer día. Cada día gana 4 canicas más que el día anterior.",
+        qa: "¿Cuántas canicas ganará Pedro el día 20?", qb: "¿Cuántas canicas habrá ganado en total hasta el día 20?",
+        a1: {n: 10, d: 1}, r: {n: 4, d: 1}, n: 20
+      },
+      {
+        id: 3, title: "El clima extremo", icon: "thermometer",
+        color: "from-cyan-500/30 to-sky-600/30",
+        statement: "En un experimento, la temperatura inicial es de -15°C en la primera hora. Cada hora la temperatura aumenta 4°C.",
+        qa: "¿Cuál será la temperatura a la hora 10?", qb: "¿Cuál será la suma de todas las temperaturas registradas hasta la hora 10?",
+        a1: {n: -15, d: 1}, r: {n: 4, d: 1}, n: 10
+      },
+      {
+        id: 4, title: "Los vasos reciclados", icon: "cup-soda",
+        color: "from-orange-500/30 to-red-600/30",
+        statement: "En una campaña de reciclaje, el primer salón reúne 15 vasos. Cada salón siguiente reúne 6 vasos más que el anterior.",
+        qa: "¿Cuántos vasos reunirá el salón 14?", qb: "¿Cuántos vasos se habrán reunido en total hasta el salón 14?",
+        a1: {n: 15, d: 1}, r: {n: 6, d: 1}, n: 14
+      },
+      {
+        id: 5, title: "El yogur preparado", icon: "milk",
+        color: "from-fuchsia-500/30 to-pink-600/30",
+        statement: "El primer recipiente contiene 3/4 de litro de yogur. Cada nuevo recipiente contiene 1/2 litro más que el anterior.",
+        qa: "¿Cuántos litros contendrá el recipiente 18?", qb: "¿Cuántos litros de yogur habrá en total hasta el recipiente 18?",
+        a1: {n: 3, d: 4}, r: {n: 1, d: 2}, n: 18
+      },
+      {
+        id: 6, title: "La cuerda para un juego", icon: "scan-line",
+        color: "from-amber-500/30 to-yellow-600/30",
+        statement: "La primera cuerda mide 2/5 de metro. Cada cuerda siguiente mide 3/5 de metro más que la anterior.",
+        qa: "¿Cuánto medirá la cuerda número 15?", qb: "¿Cuál será la longitud total de las primeras 15 cuerdas?",
+        a1: {n: 2, d: 5}, r: {n: 3, d: 5}, n: 15
+      },
+      {
+        id: 7, title: "Las canicas de Manuel", icon: "gamepad-2",
+        color: "from-violet-500/30 to-purple-600/30",
+        statement: "Manuel canjea estampillas por canicas. El primer día recibe 2 canicas, el segundo 6, el tercero 10, y así recibe 4 canicas más cada día.",
+        qa: "¿Cuántas canicas recibirá exactamente el día 30?", qb: "¿Cuántas canicas habrá acumulado en total al cabo de los 30 días?",
+        a1: {n: 2, d: 1}, r: {n: 4, d: 1}, n: 30
+      },
+      {
+        id: 8, title: "Las tizas del profesor", icon: "pen-tool",
+        color: "from-lime-500/30 to-green-600/30",
+        statement: "El profesor Beto gasta tizas. La primera semana gastó 11, la segunda 13, la tercera 15, aumentando su uso en 2 tizas por semana.",
+        qa: "¿Cuántas tizas gastará en la semana 38?", qb: "¿Cuántas tizas habrá utilizado en total al cabo de las 38 semanas?",
+        a1: {n: 11, d: 1}, r: {n: 2, d: 1}, n: 38
+      }
+    ];
+
+    // ==========================================
+    // SISTEMA DE AUDIO
+    // ==========================================
+    const AudioController = {
+      ctx: null, muted: false,
+      init: function() {
+        if (this.ctx) return;
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (AudioContext) this.ctx = new AudioContext();
+      },
+      play: function(type) {
+        if (this.muted || !this.ctx) return;
+        if (this.ctx.state === 'suspended') this.ctx.resume();
+
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.connect(gain); gain.connect(this.ctx.destination);
+        const now = this.ctx.currentTime;
+
+        if (type === 'pop') {
+          osc.type = 'sine'; osc.frequency.setValueAtTime(450, now); osc.frequency.exponentialRampToValueAtTime(700, now + 0.1);
+          gain.gain.setValueAtTime(0.3, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+          osc.start(now); osc.stop(now + 0.1);
+        } else if (type === 'pop-reverse') {
+          osc.type = 'triangle'; osc.frequency.setValueAtTime(600, now); osc.frequency.exponentialRampToValueAtTime(250, now + 0.15);
+          gain.gain.setValueAtTime(0.2, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+          osc.start(now); osc.stop(now + 0.15);
+        } else if (type === 'success') {
+          osc.disconnect();
+          const notes = [523.25, 659.25, 783.99, 1046.50];
+          notes.forEach((freq, i) => {
+            const o = this.ctx.createOscillator(); const g = this.ctx.createGain();
+            o.type = 'triangle'; o.frequency.value = freq;
+            o.connect(g); g.connect(this.ctx.destination);
+            const startTime = now + (i * 0.08);
+            g.gain.setValueAtTime(0, startTime);
+            g.gain.linearRampToValueAtTime(0.2, startTime + 0.05);
+            g.gain.linearRampToValueAtTime(0, startTime + 0.4);
+            o.start(startTime); o.stop(startTime + 0.4);
+          });
+        } else if (type === 'swoosh') {
+          osc.type = 'sine'; osc.frequency.setValueAtTime(250, now); osc.frequency.exponentialRampToValueAtTime(40, now + 0.2);
+          gain.gain.setValueAtTime(0.25, now); gain.gain.linearRampToValueAtTime(0.01, now + 0.2);
+          osc.start(now); osc.stop(now + 0.2);
+        }
+      },
+      toggleMute: function() { this.muted = !this.muted; return this.muted; }
+    };
+
+    // ==========================================
+    // ESTADO DE LA APLICACIÓN
+    // ==========================================
+    let AppState = {
+      view: 'home',
+      activeExIdx: 0,
+      step: 0,
+      maxSteps: 9,
+      isMuted: false
+    };
+
+    // Funciones de acción globales
+    window.loadExercise = (idx) => {
+      AudioController.init();
+      AudioController.play('swoosh');
+      AppState.activeExIdx = idx;
+      AppState.step = 0;
+      AppState.view = 'lab';
+      renderApp();
+      gsap.fromTo("#stepContainer", { scale: 0.85, opacity: 0, y: 30 }, { scale: 1, opacity: 1, y: 0, duration: 0.5, ease: "back.out(1.5)" });
+    };
+
+    window.goHome = () => {
+      AudioController.init();
+      AudioController.play('swoosh');
+      AppState.view = 'home';
+      AppState.step = 0;
+      renderApp();
+      gsap.fromTo("#homeContainer", { opacity: 0 }, { opacity: 1, duration: 0.8 });
+    };
+
+    window.toggleMute = () => {
+      AudioController.init();
+      AppState.isMuted = AudioController.toggleMute();
+      renderApp();
+    };
+
+    window.nextStep = () => {
+      AudioController.init();
+      if (AppState.step < AppState.maxSteps) {
+        AppState.step++;
+        if (AppState.step === AppState.maxSteps || AppState.step === 4) AudioController.play('success'); 
+        else AudioController.play('pop');
+        renderApp();
+        gsap.fromTo("#stepContainer", { scale: 0.85, opacity: 0, y: 30 }, { scale: 1, opacity: 1, y: 0, duration: 0.5, ease: "back.out(1.5)" });
+      }
+    };
+
+    window.prevStep = () => {
+      AudioController.init();
+      if (AppState.step > 0) {
+        AppState.step--;
+        AudioController.play('pop-reverse');
+        renderApp();
+        gsap.fromTo("#stepContainer", { scale: 0.85, opacity: 0, y: 30 }, { scale: 1, opacity: 1, y: 0, duration: 0.5, ease: "back.out(1.5)" });
+      }
+    };
+
+    // ==========================================
+    // GENERADORES HTML DE COMPONENTES
+    // ==========================================
+    function getFloatingBg() {
+      const symbols = ['t_n', 'S_n', '+', '-', '\\times', '\\div', 'r', 'n', '✨', '❄️', '\\frac{1}{4}', '\\frac{1}{2}'];
+      let elements = '';
+      for(let i=0; i<30; i++) {
+        let symbol = symbols[Math.floor(Math.random() * symbols.length)];
+        let left = `${Math.random() * 100}%`;
+        let duration = `${10 + Math.random() * 15}s`;
+        let delay = `-${Math.random() * 20}s`;
+        let size = `${1 + Math.random() * 3}rem`;
+        let opacity = 0.1 + Math.random() * 0.25;
+        let content = symbol.includes('\\') ? `<span class="math-tex" data-tex="${symbol}" data-block="false"></span>` : symbol;
+        
+        elements += `<div class="absolute text-white font-black animate-floatUp select-none drop-shadow-lg"
+          style="left: ${left}; bottom: -15%; font-size: ${size}; opacity: ${opacity}; animation-duration: ${duration}; animation-delay: ${delay};">
+          ${content}</div>`;
+      }
+      return `<div class="absolute inset-0 overflow-hidden pointer-events-none z-0">${elements}</div>`;
+    }
+
+    function getConfetti() {
+      const colors = ['#fde047', '#60a5fa', '#f472b6', '#34d399', '#a78bfa', '#ff5722'];
+      let pieces = '';
+      for(let i=0; i<100; i++) {
+        let left = `${50 + (Math.random() * 20 - 10)}%`;
+        let color = colors[Math.floor(Math.random() * colors.length)];
+        let tx = `${(Math.random() - 0.5) * 600}px`;
+        let ty = `${(Math.random() - 1) * 600}px`;
+        let rot = `${Math.random() * 720}deg`;
+        let delay = `${Math.random() * 0.2}s`;
+        
+        pieces += `<div class="absolute w-4 h-4 sm:w-5 sm:h-5 rounded-full animate-confettiExplosion shadow-sm"
+          style="background-color: ${color}; --tx: ${tx}; --ty: ${ty}; --rot: ${rot}; animation-delay: ${delay}; left: ${left}; top: 50%;"></div>`;
+      }
+      return `<div class="absolute inset-0 pointer-events-none z-50 flex items-center justify-center overflow-hidden">${pieces}</div>`;
+    }
+
+    function getRobotHTML(step, maxSteps) {
+      const isFinalStep = step === maxSteps;
+      const isTransition = step === 4; 
+      const isHappy = isFinalStep || isTransition;
+      
+      const containerAnim = isHappy ? 'animate-robotJump' : 'animate-robotFloat';
+      const armLAnim = isHappy ? 'rotate-[150deg] animate-pulse' : (step > 0 ? 'animate-robotTalkArmL' : 'rotate-45');
+      const armRAnim = isHappy ? '-rotate-[150deg] animate-pulse' : (step > 0 ? 'animate-robotTalkArmR' : '-rotate-45');
+      
+      const isPulseEye = step === 0 || step === 5;
+      
+      let eyesHTML = '';
+      if (isHappy) {
+        eyesHTML = `<div class="w-full flex justify-between px-1.5"><div class="w-4 h-2 bg-emerald-400 rounded-t-full mt-1"></div><div class="w-4 h-2 bg-emerald-400 rounded-t-full mt-1"></div></div>`;
+      } else if (isPulseEye) {
+        eyesHTML = `<div class="w-full flex justify-between px-2"><div class="w-2.5 h-2.5 bg-cyan-400 rounded-full animate-pulse"></div><div class="w-2.5 h-2.5 bg-cyan-400 rounded-full animate-pulse"></div></div>`;
+      } else {
+        eyesHTML = `<div class="w-full flex justify-between px-1.5"><div class="w-4 h-4 bg-yellow-400 rounded-full animate-bounce"></div><div class="w-4 h-4 bg-yellow-400 rounded-full animate-bounce"></div></div>`;
+      }
+
+      let mouthHTML = '';
+      if (isHappy) {
+        mouthHTML = `<div class="w-7 h-5 bg-rose-400 rounded-b-full mt-1.5"></div>`;
+      } else if (isPulseEye) {
+        mouthHTML = `<div class="w-5 h-1.5 bg-slate-700 rounded-full mt-2"></div>`;
+      } else {
+        mouthHTML = `<div class="w-4 h-5 bg-slate-700 rounded-full mt-1 animate-ping"></div>`;
+      }
+
+      const topLightClass = isHappy ? 'text-emerald-400 bg-emerald-400' : 'text-yellow-400 bg-yellow-400 animate-pulse';
+
+      return `
+        <div class="relative flex flex-col items-center drop-shadow-lg cursor-pointer hover:scale-110 transition-transform ${containerAnim}">
+          <div class="relative z-0 flex flex-col items-center translate-y-1">
+            <div class="w-4 h-4 rounded-full shadow-[0_0_12px_currentColor] z-10 transition-colors duration-300 ${topLightClass}"></div>
+            <div class="w-1.5 h-5 bg-slate-400"></div>
+          </div>
+          <div class="relative z-10 w-20 h-20 sm:w-24 sm:h-24 bg-gradient-to-br from-slate-100 to-slate-300 rounded-[1.8rem] border-[4px] border-slate-400 shadow-xl flex flex-col items-center justify-center p-2 transition-transform duration-300">
+            <div class="w-full h-full bg-slate-800 rounded-xl flex flex-col items-center justify-center p-1.5 shadow-inner border-2 border-slate-600 transition-all">
+              ${eyesHTML}
+              ${mouthHTML}
+            </div>
+          </div>
+          <div class="absolute top-1/2 -left-3 w-4 h-6 bg-slate-300 border-[4px] border-slate-400 rounded-full z-0 origin-top transition-transform duration-300 ${armLAnim}"></div>
+          <div class="absolute top-1/2 -right-3 w-4 h-6 bg-slate-300 border-[4px] border-slate-400 rounded-full z-0 origin-top transition-transform duration-300 ${armRAnim}"></div>
+        </div>
+      `;
+    }
+
+    function getExplanationHTML(step, n, n_minus_1, f_mult_term, f_sum_a1_an, isFractionSum, simplifyN, simplifySum, f_sum_half, texVars) {
+      const { t_a1, t_r, t_an, t_sum, t_mult, t_Sn } = texVars;
+      
+      const hlBlue = "text-white font-black bg-[#4f46e5] px-3 py-1 rounded-xl shadow-[0_4px_0_#3730a3] inline-flex items-center transform hover:rotate-3 transition-transform cursor-default mx-1";
+      const hlGreen = "text-white font-black bg-emerald-500 px-3 py-1 rounded-xl shadow-[0_4px_0_#047857] inline-flex items-center transform hover:-rotate-3 transition-transform cursor-default mx-1";
+      const hlFuchsia = "text-white font-black bg-fuchsia-500 px-3 py-1 rounded-xl shadow-[0_4px_0_#a21caf] inline-flex items-center transform hover:rotate-3 transition-transform cursor-default mx-1";
+
+      const texWrap = (str) => `<span class="math-tex" data-tex="${str}"></span>`;
+
+      if (step === 0) return `<p>¡Vamos a resolverlo! Para la pregunta <span class="font-black text-amber-500">a)</span> hallaremos el último término (<span class="${hlBlue}">${texWrap('t_n')}</span>) usando la fórmula de Sucesión: <span class="${hlGreen}">${texWrap('t_n = t_1 + (n - 1)r')}</span>.</p>`;
+      if (step === 1) return `<p><strong>Paso 1:</strong> Sustituimos. El primer término es <strong>${texWrap(t_a1)}</strong>, buscamos la posición <strong>${n}</strong>, y la razón de crecimiento es <strong>${texWrap(t_r)}</strong>.</p>`;
+      if (step === 2) return `<p><strong>Paso 2:</strong> Resolvemos el paréntesis primero. Restamos ${n} - 1 = <span class="${hlGreen}">${n_minus_1}</span>.</p>`;
+      if (step === 3) return `<p><strong>Paso 3:</strong> Multiplicamos el resultado por la razón: ${n_minus_1} × ${texWrap(`(${t_r})`)} = <span class="${hlBlue}">${texWrap(toTex(f_mult_term))}</span>.</p>`;
+      if (step === 4) return `<p><strong>Paso 4:</strong> Finalmente sumamos: ${texWrap(t_a1)} ${texWrap(t_mult)} = <span class="text-amber-500 font-bold text-2xl ml-1">${texWrap(t_an)}</span>. ¡Resuelta la pregunta <strong>a)</strong>! 🎯</p>`;
+      
+      if (step === 5) return `<p>Ahora la pregunta <span class="font-black text-amber-500">b)</span>. Hallaremos el total acumulado usando la Serie: <span class="${hlFuchsia}">${texWrap('S_n = \\left(\\frac{t_1 + t_n}{2}\\right)n')}</span>.</p>`;
+      if (step === 6) return `<p><strong>Paso 5:</strong> Reemplazamos los datos en la fórmula. Observa cómo colocamos el primer término (${texWrap(t_a1)}) y el último que acabamos de hallar (${texWrap(t_an)}).</p>`;
+      if (step === 7) return `<p><strong>Paso 6:</strong> Resolvemos la parte superior uniendo el primer y el último término: ${texWrap(t_a1)} + ${texWrap(`(${t_an})`)} = <span class="${hlGreen}">${texWrap(t_sum)}</span>.</p>`;
+      
+      if (step === 8) {
+        if (isFractionSum) return `<p><strong>Paso 7: ¡Fracciones!</strong> Aplicamos el método de <strong>extremos y medios</strong> (la famosa "orejita"). Colocamos un 1 debajo del 2 para poder multiplicar.</p>`;
+        if (simplifyN) return `<p><strong>Paso 7: ¡El truco del profe!</strong> Como la cantidad de términos es par (${n}), simplificamos dividiendo entre 2 para que sea más fácil: ${n} ÷ 2 = <strong>${n/2}</strong>.</p>`;
+        if (simplifySum) return `<p><strong>Paso 7: ¡El truco del profe!</strong> Como la suma es par (${texWrap(f_sum_a1_an.n.toString())}), simplificamos sacándole la mitad: ${texWrap(t_sum)} ÷ 2 = <strong>${texWrap(toTex(f_sum_half))}</strong>.</p>`;
+        return `<p><strong>Paso 7: ¡A dividir!</strong> Dividimos la suma entre 2: ${texWrap(t_sum)} ÷ 2 = <strong>${texWrap(toTex(f_sum_half))}</strong>.</p>`;
+      }
+      
+      if (step === 9) {
+        if (isFractionSum) return `<p><strong>Paso 8: ¡A simplificar!</strong> Simplificamos cruzado los numeradores con los denominadores. ¡Así los números se reducen y llegamos al resultado final: <strong>${texWrap(t_Sn)}</strong>! 🚀</p>`;
+        return `<p><strong>Paso 8:</strong> Finalmente multiplicamos los valores resultantes: ${texWrap(toTex(!simplifyN ? f_sum_half : f_sum_a1_an))} × ${!simplifyN ? n : n/2} = <span class="text-amber-500 text-2xl font-bold ml-1">${texWrap(t_Sn)}</span>. ¡Ejercicio completado! 🚀</p>`;
+      }
+    }
+
+    // ==========================================
+    // VISTA: INICIO
+    // ==========================================
+    function renderHome() {
+      const volIcon = AppState.isMuted ? 'volume-x' : 'volume-2';
+      let cardsHTML = EXERCISES.map((ex, idx) => `
+        <button onclick="window.loadExercise(${idx})" 
+          class="group text-left p-6 rounded-[2rem] bg-gradient-to-br ${ex.color} border-[2px] border-white/10 backdrop-blur-xl hover:-translate-y-3 hover:scale-[1.02] hover:shadow-[0_20px_40px_rgba(0,0,0,0.4)] hover:border-white/40 transition-all duration-300 flex flex-col h-full relative overflow-hidden animate-slideInUp"
+          style="animation-delay: ${0.4 + (idx * 0.1)}s; animation-fill-mode: both;">
+          <div class="absolute -bottom-4 -right-4 p-4 opacity-10 group-hover:opacity-25 group-hover:scale-125 transition-all duration-500 text-white">
+            <i data-lucide="${ex.icon}" class="w-24 h-24"></i>
+          </div>
+          <div class="bg-white/10 text-white text-xs sm:text-sm font-bold px-4 py-1.5 rounded-full inline-block mb-4 shadow-sm backdrop-blur-md self-start border border-white/20">
+            Ejercicio ${ex.id}
+          </div>
+          <h3 class="text-xl sm:text-2xl font-black text-white mb-3 drop-shadow-md leading-tight">${ex.title}</h3>
+          <p class="text-white/80 text-sm font-medium line-clamp-3 mt-auto leading-relaxed">${ex.statement}</p>
+        </button>
+      `).join('');
+
+      return `
+        <div id="homeContainer" class="min-h-[100dvh] bg-[#0a0f1d] flex flex-col items-center justify-center p-4 sm:p-8 relative overflow-x-hidden">
+          <div class="absolute top-[10%] left-1/4 -translate-x-1/2 w-[400px] h-[400px] sm:w-[600px] sm:h-[600px] bg-blue-600/30 blur-[100px] rounded-full pointer-events-none z-0 mix-blend-screen animate-pulse" style="animation-duration: 4s;"></div>
+          <div class="absolute bottom-[5%] right-[10%] w-[300px] h-[300px] sm:w-[500px] sm:h-[500px] bg-fuchsia-600/20 blur-[80px] rounded-full pointer-events-none z-0 mix-blend-screen animate-pulse" style="animation-duration: 6s; animation-delay: 1s;"></div>
+          <div class="absolute top-[40%] right-1/4 w-[250px] h-[250px] bg-cyan-400/20 blur-[90px] rounded-full pointer-events-none z-0 mix-blend-screen animate-pulse" style="animation-duration: 5s; animation-delay: 2s;"></div>
+          
+          ${getFloatingBg()}
+          
+          <div class="absolute top-4 right-4 z-20">
+             <button onclick="window.toggleMute()" class="p-3 rounded-2xl bg-white/10 backdrop-blur-md shadow-lg text-white hover:bg-white/20 transition-all hover:scale-110 active:scale-95 border border-white/10">
+              <i data-lucide="${volIcon}"></i>
+            </button>
+          </div>
+
+          <div class="relative z-10 text-center w-full max-w-7xl mt-4 sm:mt-0 flex flex-col items-center">
+            <div class="inline-flex items-center gap-2 px-6 py-2 rounded-full border-2 border-cyan-400/40 bg-slate-900/40 backdrop-blur-xl text-cyan-300 font-black tracking-widest uppercase mb-6 shadow-2xl animate-slideInUp" style="animation-delay: 0.1s;">
+               <i data-lucide="book-open" class="w-5 h-5"></i> TuProfe20 Lab
+            </div>
+            <h1 class="text-5xl sm:text-7xl md:text-[5.5rem] leading-[1.1] font-black text-transparent bg-clip-text bg-gradient-to-br from-white via-cyan-200 to-blue-500 mb-6 drop-shadow-[0_4px_12px_rgba(0,0,0,0.5)] animate-slideInUp" style="animation-delay: 0.2s;">
+              Laboratorio de <br class="hidden sm:block"/>Sucesiones y Series
+            </h1>
+            <p class="text-lg md:text-2xl text-blue-200/90 mb-12 font-bold max-w-3xl mx-auto px-4 animate-slideInUp" style="animation-delay: 0.3s;">
+              Selecciona un ejercicio de tu práctica para resolverlo paso a paso utilizando un potente motor matemático. 📐✨
+            </p>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 w-full px-2 pb-8">
+              ${cardsHTML}
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // ==========================================
+    // VISTA: LABORATORIO
+    // ==========================================
+    function renderLab() {
+      const activeEx = EXERCISES[AppState.activeExIdx];
+      const step = AppState.step;
+      const volIcon = AppState.isMuted ? 'volume-x' : 'volume-2';
+      
+      // Lógica Matemática
+      const f_a1 = frac(activeEx.a1.n, activeEx.a1.d);
+      const f_r = frac(activeEx.r.n, activeEx.r.d);
+      const n = activeEx.n;
+      const n_minus_1 = n - 1;
+      const f_mult_term = f_mulInt(f_r, n_minus_1);
+      const f_an = f_add(f_a1, f_mult_term);
+      const f_sum_a1_an = f_add(f_a1, f_an);
+      const f_Sn = f_mulInt(f_divInt(f_sum_a1_an, 2), n);
+      const isFractionSum = f_sum_a1_an.d > 1;
+      const simplifyN = !isFractionSum && (n % 2 === 0);
+      const simplifySum = !isFractionSum && !simplifyN && (f_sum_a1_an.n % 2 === 0);
+      const f_sum_half = f_divInt(f_sum_a1_an, 2); 
+
+      const texVars = {
+        t_a1: toTex(f_a1),
+        t_r: toTex(f_r),
+        t_r_sign: toTex(f_r, true),
+        t_an: toTex(f_an),
+        t_sum: toTex(f_sum_a1_an),
+        t_mult: toTex(f_mult_term, true),
+        t_Sn: toTex(f_Sn)
+      };
+
+      const wrap = (t, extraClass="") => `<span class="math-tex ${extraClass}" data-tex="${t}" data-block="false"></span>`;
+      
+      let stepHTML = '';
+      if (step <= 4) {
+        let mathStr = '';
+        if (step === 0) mathStr = wrap("t_n = t_1 + (n - 1)r", "text-5xl sm:text-7xl text-slate-500 opacity-60");
+        if (step === 1) mathStr = wrap(`t_{${n}} = ${texVars.t_a1} + (${n} - 1) \\cdot (${texVars.t_r})`, "text-5xl sm:text-7xl text-slate-800");
+        if (step === 2) mathStr = wrap(`t_{${n}} = ${texVars.t_a1} + (\\color{#059669}${n_minus_1}) \\cdot (${texVars.t_r})`, "text-5xl sm:text-7xl text-slate-800");
+        if (step === 3) mathStr = wrap(`t_{${n}} = ${texVars.t_a1} \\color{#2563eb}${texVars.t_mult}`, "text-5xl sm:text-7xl text-slate-800");
+        if (step === 4) mathStr = `<div class="bg-gradient-to-br from-[#fde047] to-[#eab308] px-12 py-6 rounded-3xl shadow-[0_15px_35px_rgba(234,179,8,0.4)] border-[6px] border-[#ca8a04]">${wrap(`t_{${n}} = \\color{#78350f}${texVars.t_an}`, "text-7xl sm:text-8xl text-black font-black")}</div>`;
+        
+        stepHTML = `<div class="bg-white/80 backdrop-blur-md px-6 sm:px-12 py-8 rounded-[2rem] border-4 border-slate-200 shadow-xl flex items-center justify-center min-w-[300px]">${mathStr}</div>`;
+      } else {
+        let mathStr = '';
+        if (step === 5) mathStr = wrap(`S_{${n}} = \\left( \\frac{t_1 + t_n}{2} \\right) \\times n`, "text-5xl sm:text-7xl text-slate-500 opacity-80");
+        if (step === 6) mathStr = wrap(`S_{${n}} = \\left( \\frac{${texVars.t_a1} + \\color{#059669}${texVars.t_an}}{2} \\right) \\times ${n}`, "text-5xl sm:text-7xl text-slate-800");
+        if (step === 7) mathStr = wrap(`S_{${n}} = \\left( \\frac{\\color{#059669}${texVars.t_sum}}{2} \\right) \\times ${n}`, "text-5xl sm:text-7xl text-slate-800");
+        if (step === 8) {
+          if (isFractionSum) mathStr = wrap(`S_{${n}} = \\left( \\frac{\\frac{\\color{#059669}${f_sum_a1_an.n}}{\\color{#059669}${f_sum_a1_an.d}}}{\\frac{2}{1}} \\right) \\times ${n}`, "text-5xl sm:text-7xl text-slate-800");
+          else if (simplifyN) mathStr = wrap(`S_{${n}} = ${texVars.t_sum} \\times \\color{#4f46e5}${n/2}`, "text-5xl sm:text-7xl text-slate-800");
+          else mathStr = wrap(`S_{${n}} = \\color{#059669}${toTex(f_sum_half)} \\times ${n}`, "text-5xl sm:text-7xl text-slate-800");
+        }
+        if (step === 9) {
+          if (isFractionSum) mathStr = `<div class="flex flex-col items-center">
+              ${wrap(`S_{${n}} = \\left( \\frac{\\cancel{${Math.abs(f_sum_a1_an.n)}} \\times \\cancel{1}}{\\cancel{${f_sum_a1_an.d}} \\times \\cancel{2}} \\right) \\times \\cancel{${n}}`, "text-4xl sm:text-6xl text-slate-500 mb-6")}
+              <div class="bg-gradient-to-br from-[#fde047] to-[#eab308] px-12 py-6 rounded-3xl shadow-[0_15px_35px_rgba(234,179,8,0.4)] border-[6px] border-[#ca8a04]">
+                ${wrap(`S_{${n}} = \\color{#78350f}${texVars.t_Sn}`, "text-7xl sm:text-9xl text-black")}
+              </div>
+            </div>`;
+          else mathStr = `<div class="bg-gradient-to-br from-[#fde047] to-[#eab308] px-16 py-8 rounded-3xl shadow-[0_15px_35px_rgba(234,179,8,0.4)] border-[6px] border-[#ca8a04]">
+              ${wrap(`S_{${n}} = \\color{#78350f}${texVars.t_Sn}`, "text-7xl sm:text-9xl text-black")}
+            </div>`;
+        }
+        stepHTML = `<div class="bg-white/80 backdrop-blur-md px-6 sm:px-12 py-8 rounded-[2rem] border-4 border-slate-200 shadow-xl flex flex-col items-center justify-center min-w-[300px]">${mathStr}</div>`;
+      }
+
+      const isFinished = step === AppState.maxSteps;
+
+      return `
+        <div class="min-h-[100dvh] w-full bg-gradient-to-br from-indigo-500 via-purple-500 to-fuchsia-500 text-slate-800 flex flex-col p-2 sm:p-4 relative overflow-hidden">
+          ${getFloatingBg()}
+          ${isFinished ? getConfetti() : ''}
+
+          <!-- HEADER -->
+          <div class="shrink-0 relative z-10 w-full max-w-7xl mx-auto flex justify-between items-center mb-3 px-2">
+            <button onclick="window.goHome()" class="flex items-center justify-center w-12 h-12 sm:w-auto sm:px-5 sm:py-2.5 rounded-[1.2rem] bg-white/20 border-2 border-white/40 backdrop-blur-md text-white font-black hover:bg-white/30 transition-all shadow-md active:scale-95 hover:scale-105">
+              <i data-lucide="home" class="w-6 h-6 sm:mr-2"></i>
+              <span class="hidden sm:inline text-lg">Ejercicios</span>
+            </button>
+
+            <h2 class="text-lg sm:text-2xl md:text-3xl font-black text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)] tracking-wide bg-black/20 px-6 py-2 rounded-full border border-white/20 text-center truncate mx-2">
+              Ejercicio ${activeEx.id}: ${activeEx.title}
+            </h2>
+            
+            <button onclick="window.toggleMute()" class="flex p-3 rounded-[1.2rem] bg-white/20 border-2 border-white/40 backdrop-blur-md text-white hover:bg-white/30 transition-all shadow-md active:scale-95 hover:scale-105">
+              <i data-lucide="${volIcon}" class="w-6 h-6"></i>
+            </button>
+          </div>
+
+          <!-- TARJETA UNIFICADA -->
+          <div class="flex-1 min-h-[60vh] relative z-10 w-full max-w-7xl mx-auto bg-[#fdfdfd] rounded-[1.5rem] sm:rounded-[2.5rem] border-[5px] sm:border-[8px] border-blue-600 shadow-[0_20px_50px_rgba(0,0,0,0.4)] flex flex-col overflow-hidden">
+            
+            <!-- CUADRÍCULA DE FONDO GLOBAL CON OPACIDAD 0.15 -->
+            <div class="absolute inset-0 opacity-[0.15] bg-[linear-gradient(#475569_1px,transparent_1px),linear-gradient(90deg,#475569_1px,transparent_1px)] [background-size:20px_20px] pointer-events-none z-0"></div>
+
+            <!-- LA PIZARRA CENTRAL -->
+            <div class="flex-1 flex flex-col items-center justify-start pt-4 pb-8 sm:pt-6 sm:pb-12 px-4 sm:px-8 relative overflow-y-auto w-full z-10">
+              
+              <div class="w-full flex flex-col items-center transition-transform max-w-full flex-1">
+                
+                <!-- ENUNCIADO -->
+                <div class="w-full max-w-6xl bg-amber-50 rounded-2xl border-l-[8px] border-amber-500 p-4 sm:p-6 mb-6 shadow-sm relative">
+                   <p class="text-slate-700 text-base sm:text-xl font-bold mb-3">${activeEx.statement}</p>
+                   <div class="flex flex-col sm:flex-row gap-2 sm:gap-6 text-sm sm:text-lg font-black text-amber-700">
+                      <span class="${step <= 4 ? "bg-amber-200/50 px-3 py-1 rounded-lg" : "px-3 py-1 opacity-50 grayscale"}">a) ${activeEx.qa}</span>
+                      <span class="${step >= 5 ? "bg-amber-200/50 px-3 py-1 rounded-lg" : "px-3 py-1 opacity-50 grayscale"}">b) ${activeEx.qb}</span>
+                   </div>
+                   ${isFinished ? `<div class="absolute top-4 right-4 bg-gradient-to-r from-yellow-400 to-amber-500 text-white font-black px-4 py-2 rounded-xl animate-bounce shadow-lg border-2 border-yellow-200 flex items-center gap-2 text-lg z-20"><i data-lucide="star" class="fill-current w-5 h-5"></i> ¡Terminado!</div>` : ''}
+                </div>
+
+                <!-- BANNER DUAL -->
+                <div class="w-full max-w-6xl bg-white rounded-3xl shadow-sm border-[4px] border-blue-600 mb-6 sm:mb-10 flex flex-col lg:flex-row overflow-hidden relative z-10">
+                  
+                  <!-- LADO IZQ: SUCESIÓN -->
+                  <div class="flex-1 p-4 sm:p-6 flex flex-col items-center justify-center relative transition-all duration-500 ${step <= 4 ? 'bg-indigo-50/50' : 'opacity-40 grayscale scale-[0.98]'}">
+                    ${step <= 4 ? `<div class="absolute top-0 left-0 w-full lg:w-2 h-2 lg:h-full bg-indigo-500"></div>` : ''}
+                    <div class="absolute top-2 left-4 px-3 py-1 bg-indigo-100 text-indigo-700 font-bold rounded-full text-xs sm:text-sm uppercase tracking-wider">a) Sucesión</div>
+                    
+                    <div class="flex flex-col items-center mt-6 w-full font-katex text-2xl sm:text-4xl text-slate-800">
+                      <div class="flex items-end justify-center gap-2 flex-wrap">
+                        ${wrap(`t_1 = ${texVars.t_a1}`, 'mx-2')}
+                        <span class="text-red-500 font-black">;</span>
+                        ${wrap(`t_2 = ${toTex(f_add(f_a1, f_r))}`, 'mx-2')}
+                        <span class="text-red-500 font-black">;</span>
+                        ${wrap(`\\dots`, 'mx-2 text-slate-400')}
+                        <span class="text-red-500 font-black">;</span>
+                        <div class="flex flex-col items-center mx-2">
+                           ${wrap(`t_{${n}} = ${step >= 4 ? `\\color{#d97706}${texVars.t_an}` : '?'}`)}
+                        </div>
+                      </div>
+                      <div class="flex items-center mt-4 text-orange-500 font-black text-lg relative w-[60%] justify-start pl-4 sm:pl-8">
+                         <div class="relative flex items-center">
+                            <svg class="absolute -top-4 left-0 w-12 h-6 sm:w-16 sm:h-8 text-orange-400" viewBox="0 0 100 50" fill="none" xmlns="http://www.w3.org/2000/svg">
+                               <path d="M0 20 Q 50 70 100 20" stroke="currentColor" stroke-width="4" fill="none" />
+                               <path d="M90 10 L 100 20 L 85 25" stroke="currentColor" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                            <span class="relative top-4 bg-white/80 px-2 rounded flex items-center gap-1 text-2xl">
+                              ${wrap(`r = ${texVars.t_r_sign}`)}
+                            </span>
+                         </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- DIVISOR CENTRAL -->
+                  <div class="w-full h-[4px] lg:w-[4px] lg:h-auto bg-blue-600"></div>
+
+                  <!-- LADO DER: SUMA -->
+                  <div class="flex-1 p-4 sm:p-6 flex flex-col items-center justify-center relative transition-all duration-500 ${step >= 5 ? 'bg-fuchsia-50/50' : 'opacity-40 grayscale scale-[0.98]'}">
+                    ${step >= 5 ? `<div class="absolute top-0 right-0 w-full lg:w-2 h-2 lg:h-full bg-fuchsia-500"></div>` : ''}
+                    <div class="absolute top-2 left-4 px-3 py-1 bg-fuchsia-100 text-fuchsia-700 font-bold rounded-full text-xs sm:text-sm uppercase tracking-wider">b) Suma Total (Serie)</div>
+                    
+                    <div class="flex flex-col items-center w-full mt-6">
+                      <div class="flex items-center justify-center gap-2 text-2xl sm:text-4xl text-slate-800 w-full pb-3 flex-wrap">
+                         ${wrap(`${texVars.t_a1} + ${toTex(f_add(f_a1, f_r))} + \\dots + ${step >= 4 ? `\\color{#d97706}${texVars.t_an}` : `t_{${n}}`}`)}
+                      </div>
+                      <div class="w-[80%] border-t-[4px] border-emerald-500 flex flex-col items-center pt-2 relative mt-2">
+                         <div class="absolute -top-[8px] w-3 h-3 bg-emerald-500 rotate-45 transform origin-center"></div>
+                         <span class="text-blue-700 font-black text-sm sm:text-lg uppercase tracking-wider mt-1">${n} Términos</span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                </div>
+
+                <!-- ÁREA DE OPERACIONES MATEMÁTICAS -->
+                <div class="flex-1 flex flex-col items-center justify-center w-full min-h-[14rem] sm:min-h-[18rem] px-2 sm:px-8">
+                   <div id="stepContainer" class="w-full flex justify-center">
+                     ${stepHTML}
+                   </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- EXPLICACIÓN DEL ROBOT -->
+            <div class="shrink-0 bg-white/80 backdrop-blur-md w-full px-4 py-4 sm:px-8 sm:py-6 flex items-center gap-4 sm:gap-8 border-t-[6px] border-slate-200 z-10 relative">
+              <div class="shrink-0 absolute -top-16 sm:relative sm:-top-0 left-4 sm:left-0">
+                 ${getRobotHTML(step, AppState.maxSteps)}
+              </div>
+              <div class="flex-1 text-lg sm:text-xl md:text-2xl font-black text-slate-800 leading-snug sm:leading-relaxed ml-20 sm:ml-0 bg-slate-50/80 sm:bg-transparent p-4 sm:p-0 rounded-2xl sm:rounded-none border-2 border-slate-100 sm:border-none shadow-inner sm:shadow-none min-h-[6rem] flex items-center">
+                <div class="animate-slideInRight font-bold w-full">
+                  ${getExplanationHTML(step, n, n_minus_1, f_mult_term, f_sum_a1_an, isFractionSum, simplifyN, simplifySum, f_sum_half, texVars)}
+                </div>
+              </div>
+            </div>
+
+            <!-- CONTROLES INFERIORES -->
+            <div class="shrink-0 bg-white/80 backdrop-blur-md p-4 sm:p-6 w-full flex flex-col items-center gap-4 border-t-[6px] border-slate-200 z-10 relative">
+              <div class="flex justify-center items-stretch w-full max-w-4xl gap-4 h-16 sm:h-20">
+                <button 
+                  onclick="window.prevStep()" ${step === 0 ? 'disabled' : ''}
+                  class="flex-[0.8] bg-indigo-300 border-b-[6px] border-indigo-500 text-indigo-900 rounded-l-[1.5rem] rounded-r-2xl font-black text-lg sm:text-2xl flex items-center justify-center gap-2 active:border-b-0 active:translate-y-[6px] disabled:opacity-50 transition-all hover:bg-indigo-200"
+                >
+                  <i data-lucide="chevron-left" class="w-7 h-7 sm:w-10 sm:h-10 stroke-[4px]"></i> <span class="hidden md:inline">Atrás</span>
+                </button>
+
+                <div class="bg-indigo-600 text-white font-black px-5 sm:px-8 text-xl sm:text-2xl flex items-center justify-center rounded-2xl border-b-[6px] border-indigo-800 shadow-inner min-w-[5rem]">
+                   Paso ${step}/${AppState.maxSteps}
+                </div>
+
+                <button 
+                  onclick="window.nextStep()" ${step === AppState.maxSteps ? 'disabled' : ''}
+                  class="flex-[2] bg-gradient-to-r from-[#f59e0b] to-[#f97316] border-b-[6px] border-[#c2410c] text-white rounded-r-[1.5rem] rounded-l-2xl font-black text-xl sm:text-3xl flex items-center justify-center gap-2 active:border-b-0 active:translate-y-[6px] disabled:opacity-50 disabled:grayscale transition-all hover:brightness-110 shadow-sm"
+                >
+                  ${step === 4 ? "¡Pasar a la Suma!" : "Siguiente Paso"} <i data-lucide="chevron-right" class="w-8 h-8 sm:w-10 sm:h-10 stroke-[4px]"></i>
+                </button>
+              </div>
+
+              ${isFinished ? `
+                <button onclick="window.goHome()" class="mt-2 text-indigo-600 font-bold hover:text-indigo-800 underline underline-offset-4 flex items-center gap-2">
+                  <i data-lucide="rotate-ccw" class="w-5 h-5"></i> Volver al listado de ejercicios
+                </button>
+              ` : ''}
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // ==========================================
+    // RENDERIZADOR PRINCIPAL
+    // ==========================================
+    function renderApp() {
+      const root = document.getElementById('root');
+      if (AppState.view === 'home') {
+        root.innerHTML = renderHome();
+      } else {
+        root.innerHTML = renderLab();
+      }
+      
+      // Post-Render: Inicializar Iconos Lucide
+      lucide.createIcons();
+      
+      // Post-Render: Procesar Ecuaciones KaTeX
+      const mathElements = document.querySelectorAll('.math-tex');
+      mathElements.forEach(el => {
+        const tex = el.getAttribute('data-tex');
+        const block = el.getAttribute('data-block') === 'true';
+        if (tex) {
+          try {
+            katex.render(tex, el, {
+              displayMode: block,
+              throwOnError: false,
+              strict: false
+            });
+          } catch (e) {
+            console.error("KaTeX Error:", e);
+            el.innerHTML = tex; 
+          }
+        }
+      });
+    }
+
+    // Inicializar app al cargar la página
+    window.onload = function() {
+      renderApp();
+    };
+
+  </script>
+</body>
+</html>
